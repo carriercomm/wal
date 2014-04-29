@@ -1,0 +1,69 @@
+user  www-data;
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+	include       mime.types;
+	default_type  application/octet-stream;
+	sendfile        on;
+	keepalive_timeout  65;
+  	tcp_nopush on;
+	tcp_nodelay on;
+	types_hash_max_size 2048;  
+	limit_conn_zone $binary_remote_addr zone=addr:10m;
+
+
+server {
+    listen 80;
+     		server_name  _;
+#		rewrite ^/(.*)$ https://$host/$1 permanent;
+	        location ~* {
+		limit_conn   addr  1;
+#               proxy_http_version 2.0;
+                proxy_pass    http://IPADDR:HTTPP;
+#               stub_status on;
+                proxy_set_header        Host            $host;
+        	proxy_set_header        X-Real-IP       $remote_addr;
+		proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+#		proxy_redirect off;
+		ModSecurityEnabled on;
+                ModSecurityConfig /opt/modsecurity/etc/conf/login.conf;
+                allow all;
+
+        }
+
+
+}
+
+    server {
+        listen       443;
+        server_name  _;
+	ssl on;
+	ssl_certificate       /home/certs/myserver.crt;
+        ssl_certificate_key  /home/certs/myserver.key;
+        ssl_ciphers      RC4:HIGH:!aNULL:!MD5:!kEDH;
+	ssl_protocols           SSLv3 TLSv1;
+        ssl_session_cache shared:SSL:10m;
+        ssl_prefer_server_ciphers on;
+
+     location ~* {
+	    	limit_conn   addr  1;
+		ModSecurityEnabled on;
+		ModSecurityConfig /opt/modsecurity/etc/conf/login.conf;
+		proxy_pass          https://IPADDR:HTTPSP;			
+		proxy_set_header        Host            $host;
+		proxy_set_header    X-Real-IP       $remote_addr;
+		proxy_set_header    X-Forwarded-For $proxy_add_x_forwarded_for;
+#		proxy_redirect		off;
+#	    proxy_set_header    Host $http_host;
+	}
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+    }
+
+}
